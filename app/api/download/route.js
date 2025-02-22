@@ -52,7 +52,3 @@ export async function POST(req) {
     );
   }
 }
-
-export const config = {
-  runtime: 'nodejs', // Ensure Node.js runtime for Vercel
-};
