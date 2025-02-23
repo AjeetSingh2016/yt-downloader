@@ -34,34 +34,27 @@ export default function Home() {
   };
 
   const handleDownload = async (downloadUrl) => {
+    console.log('Download URL:', downloadUrl);
     if (downloading) return;
-
+  
     setDownloading(true);
     try {
       const iframe = document.createElement('iframe');
       iframe.style.display = 'none';
       document.body.appendChild(iframe);
-
-      iframe.contentWindow.document.open();
-      iframe.contentWindow.document.write(`
-        <html>
-          <body>
-            <form method="get" action="${downloadUrl}">
-              <input type="submit" value="Download" />
-            </form>
-            <script>
-              document.forms[0].submit();
-            </script>
-          </body>
-        </html>
-      `);
-      iframe.contentWindow.document.close();
-
+  
+      const form = iframe.contentWindow.document.createElement('form');
+      form.method = 'GET';
+      form.action = downloadUrl;
+      iframe.contentWindow.document.body.appendChild(form);
+  
+      form.submit();
+  
       setTimeout(() => {
         document.body.removeChild(iframe);
         setDownloading(false);
       }, 2000);
-
+  
     } catch (err) {
       setError('Download failed. Please try again.');
       setDownloading(false);
