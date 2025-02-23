@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req) {
   console.log('API /download endpoint hit');
+
   try {
     const { url } = await req.json();
 

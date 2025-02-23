@@ -1,35 +1,36 @@
 'use client';
 import { useState } from 'react';
+import useSWR from 'swr';
+
+const fetcher = async (url, videoUrl) => {
+  if (!videoUrl) return null; // Prevent unnecessary requests
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: videoUrl }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error || 'Failed to fetch video info');
+  }
+
+  return res.json();
+};
 
 export default function Home() {
   const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [videoInfo, setVideoInfo] = useState(null);
   const [downloading, setDownloading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const { data: videoInfo, error, isValidating, mutate } = useSWR(
+    url ? ['/api/download', url] : null,
+    ([url, videoUrl]) => fetcher(url, videoUrl),
+    { revalidateOnFocus: false }
+  );
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    setVideoInfo(null);
-
-    try {
-      const res = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Unknown error');
-
-      setVideoInfo(data);
-    } catch (err) {
-      setError(err.message || 'Failed to get video info');
-    } finally {
-      setLoading(false);
-    }
+    mutate();
   };
 
   const handleDownload = async (downloadUrl) => {
@@ -53,7 +54,7 @@ export default function Home() {
         setDownloading(false);
       }, 2000);
     } catch (err) {
-      setError('Download failed. Please try again.');
+      console.error('Download failed:', err);
       setDownloading(false);
     }
   };
@@ -68,32 +69,32 @@ export default function Home() {
   return (
     <main className="min-h-screen p-8 bg-gray-100">
       <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow">
-        <h1 className="text-2xl font-bold mb-6">YouTube Downloader</h1>
+        <h1 className="text-2xl font-bold mb-6 text-black">YouTube Downloader</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 text-black">
           <div>
             <input
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="Enter YouTube URL"
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded text-black-500 focus:outline-none focus:border-blue-500"
               required
             />
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isValidating}
             className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
           >
-            {loading ? 'Processing...' : 'Process Video'}
+            {isValidating ? 'Processing...' : 'Process Video'}
           </button>
         </form>
 
         {error && (
           <div className="mt-4 text-red-500 text-sm">
-            {error}
+            {error.message}
           </div>
         )}
 
