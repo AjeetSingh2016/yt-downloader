@@ -1,4 +1,3 @@
-// app/page.js
 'use client';
 import { useState } from 'react';
 
@@ -23,9 +22,9 @@ export default function Home() {
       });
 
       const data = await res.json();
-      
+
       if (!res.ok) throw new Error(data.error);
-      
+
       setVideoInfo(data);
     } catch (err) {
       setError(err.message || 'Failed to get video info');
@@ -36,32 +35,38 @@ export default function Home() {
 
   const handleDownload = async (downloadUrl) => {
     if (downloading) return;
-  
+
     setDownloading(true);
     try {
-      const response = await fetch(downloadUrl);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-  
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = 'video.mp4';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-  
-      // Cleanup the Blob URL after a short delay
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      iframe.contentWindow.document.open();
+      iframe.contentWindow.document.write(`
+        <html>
+          <body>
+            <form method="get" action="${downloadUrl}">
+              <input type="submit" value="Download" />
+            </form>
+            <script>
+              document.forms[0].submit();
+            </script>
+          </body>
+        </html>
+      `);
+      iframe.contentWindow.document.close();
+
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        setDownloading(false);
+      }, 2000);
+
     } catch (err) {
       setError('Download failed. Please try again.');
-    } finally {
       setDownloading(false);
     }
   };
-  
 
   function formatFileSize(bytes) {
     if (!bytes) return 'Unknown size';
@@ -74,7 +79,7 @@ export default function Home() {
     <main className="min-h-screen p-8 bg-gray-100">
       <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow">
         <h1 className="text-2xl font-bold mb-6">YouTube Downloader</h1>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <input
@@ -86,7 +91,7 @@ export default function Home() {
               required
             />
           </div>
-          
+
           <button
             type="submit"
             disabled={loading}
@@ -111,7 +116,7 @@ export default function Home() {
                 className="w-full h-full object-cover"
               />
             </div>
-            
+
             <div>
               <h3 className="font-medium">{videoInfo.title}</h3>
               <p className="text-sm text-gray-500">

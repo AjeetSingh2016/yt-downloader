@@ -1,11 +1,10 @@
-// app/api/download/route.js
 import ytdl from '@distube/ytdl-core';
 import { NextResponse } from 'next/server';
 
 export async function POST(req) {
   try {
     const { url } = await req.json();
-    
+
     if (!ytdl.validateURL(url)) {
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
     }
@@ -17,8 +16,7 @@ export async function POST(req) {
         }
       }
     });
-    
-    // Filter formats to get only those with both video and audio
+
     const formats = info.formats
       .filter(format => format.hasVideo && format.hasAudio)
       .map(format => ({
@@ -29,7 +27,6 @@ export async function POST(req) {
         size: format.contentLength
       }))
       .sort((a, b) => {
-        // Extract numeric value from qualityLabel (e.g., "720p" -> 720)
         const qualityA = parseInt(a.qualityLabel);
         const qualityB = parseInt(b.qualityLabel);
         return qualityB - qualityA;
