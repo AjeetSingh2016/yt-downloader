@@ -22,8 +22,7 @@ export default function Home() {
       });
 
       const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Unknown error');
 
       setVideoInfo(data);
     } catch (err) {
@@ -34,27 +33,25 @@ export default function Home() {
   };
 
   const handleDownload = async (downloadUrl) => {
-    console.log('Download URL:', downloadUrl);
     if (downloading) return;
-  
     setDownloading(true);
+
     try {
       const iframe = document.createElement('iframe');
       iframe.style.display = 'none';
       document.body.appendChild(iframe);
-  
+
       const form = iframe.contentWindow.document.createElement('form');
       form.method = 'GET';
       form.action = downloadUrl;
       iframe.contentWindow.document.body.appendChild(form);
-  
+
       form.submit();
-  
+
       setTimeout(() => {
         document.body.removeChild(iframe);
         setDownloading(false);
       }, 2000);
-  
     } catch (err) {
       setError('Download failed. Please try again.');
       setDownloading(false);

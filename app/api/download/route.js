@@ -2,13 +2,16 @@ import ytdl from '@distube/ytdl-core';
 import { NextResponse } from 'next/server';
 
 export async function POST(req) {
+  console.log('API /download endpoint hit');
   try {
     const { url } = await req.json();
 
-    if (!ytdl.validateURL(url)) {
+    if (!url || !ytdl.validateURL(url)) {
+      console.error('Invalid URL provided:', url);
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
     }
 
+    // Get video info with a custom User-Agent header.
     const info = await ytdl.getInfo(url, {
       requestOptions: {
         headers: {
@@ -17,6 +20,7 @@ export async function POST(req) {
       }
     });
 
+    // Filter and map available formats.
     const formats = info.formats
       .filter(format => format.hasVideo && format.hasAudio)
       .map(format => ({
@@ -27,20 +31,21 @@ export async function POST(req) {
         size: format.contentLength
       }))
       .sort((a, b) => {
-        const qualityA = parseInt(a.qualityLabel);
-        const qualityB = parseInt(b.qualityLabel);
+        // Sort descending based on numerical quality.
+        const qualityA = parseInt(a.qualityLabel) || 0;
+        const qualityB = parseInt(b.qualityLabel) || 0;
         return qualityB - qualityA;
       });
 
     return NextResponse.json({
       formats,
       title: info.videoDetails.title,
-      thumbnail: info.videoDetails.thumbnails[0].url,
+      thumbnail: info.videoDetails.thumbnails[0]?.url || '',
       duration: info.videoDetails.lengthSeconds
     });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in /api/download:', error);
     return NextResponse.json({ error: 'Failed to get video info' }, { status: 500 });
   }
 }
