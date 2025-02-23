@@ -1,4 +1,4 @@
-// app/page.jsx
+// app/page.js
 'use client';
 import { useState } from 'react';
 
@@ -7,18 +7,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [videoInfo, setVideoInfo] = useState(null);
-
-  // URL validation
-  const isValidUrl = (url) => {
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
-    return youtubeRegex.test(url);
-  };
-
-  // Determine API URL based on environment
-  const apiUrl =
-    process.env.NODE_ENV === 'production'
-      ? `${process.env.NEXT_PUBLIC_VERCEL_URL || 'https://your-vercel-domain.vercel.app'}/api/download`
-      : '/api/download';
+  const [downloading, setDownloading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,69 +15,66 @@ export default function Home() {
     setError('');
     setVideoInfo(null);
 
-    if (!isValidUrl(url)) {
-      setError('Please enter a valid YouTube URL');
-      setLoading(false);
-      return;
-    }
-
     try {
-      const res = await fetch(apiUrl, {
+      const res = await fetch('/api/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url })
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to process video');
-      }
-
+      
+      if (!res.ok) throw new Error(data.error);
+      
       setVideoInfo(data);
     } catch (err) {
-      console.error('Frontend fetch error:', err);
-      setError(err.message || 'Download failed');
+      setError(err.message || 'Failed to get video info');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDownload = async () => {
-    if (!videoInfo) return;
-
+  const handleDownload = async (downloadUrl) => {
+    if (downloading) return;
+  
+    setDownloading(true);
     try {
-      setLoading(true);
-      const response = await fetch(videoInfo.url);
+      const response = await fetch(downloadUrl);
       if (!response.ok) {
-        throw new Error('Failed to fetch video file');
+        throw new Error('Network response was not ok');
       }
-
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-
+  
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `${videoInfo.title}.mp4`;
+      link.download = 'video.mp4';
       document.body.appendChild(link);
       link.click();
-
-      // Cleanup
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+  
+      // Cleanup the Blob URL after a short delay
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
     } catch (err) {
-      console.error('Download error:', err);
       setError('Download failed. Please try again.');
     } finally {
-      setLoading(false);
+      setDownloading(false);
     }
   };
+  
+
+  function formatFileSize(bytes) {
+    if (!bytes) return 'Unknown size';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+  }
 
   return (
     <main className="min-h-screen p-8 bg-gray-100">
       <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow">
         <h1 className="text-2xl font-bold mb-6">YouTube Downloader</h1>
-
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <input
@@ -96,50 +82,57 @@ export default function Home() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="Enter YouTube URL"
-              className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-2 border rounded"
               required
             />
           </div>
-
+          
           <button
             type="submit"
             disabled={loading}
-            className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 transition-colors"
+            className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
           >
             {loading ? 'Processing...' : 'Process Video'}
           </button>
         </form>
 
-        {loading && (
-          <div className="mt-4 flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        {error && (
+          <div className="mt-4 text-red-500 text-sm">
+            {error}
           </div>
         )}
 
-        {error && (
-          <div className="mt-4 text-red-500 text-sm">{error}</div>
-        )}
-
-        {videoInfo && !loading && (
+        {videoInfo && (
           <div className="mt-6 space-y-4">
             <div className="aspect-video bg-gray-100 rounded overflow-hidden">
-              <img
-                src={videoInfo.thumbnail}
+              <img 
+                src={videoInfo.thumbnail} 
                 alt={videoInfo.title}
                 className="w-full h-full object-cover"
               />
             </div>
-
+            
             <div>
-              <h3 className="font-medium text-gray-800">{videoInfo.title}</h3>
+              <h3 className="font-medium">{videoInfo.title}</h3>
+              <p className="text-sm text-gray-500">
+                Duration: {Math.floor(videoInfo.duration / 60)}:{(videoInfo.duration % 60).toString().padStart(2, '0')}
+              </p>
             </div>
 
-            <button
-              onClick={handleDownload}
-              className="w-full p-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-            >
-              Download Video
-            </button>
+            <div className="space-y-2">
+              <p className="font-medium">Available Qualities:</p>
+              {videoInfo.formats.map((format, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleDownload(format.url)}
+                  disabled={downloading}
+                  className="w-full p-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-green-400 flex justify-between items-center"
+                >
+                  <span>{format.qualityLabel} ({format.fps}fps)</span>
+                  <span className="text-sm">{formatFileSize(format.size)}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

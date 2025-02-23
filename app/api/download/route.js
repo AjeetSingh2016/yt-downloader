@@ -5,50 +5,45 @@ import { NextResponse } from 'next/server';
 export async function POST(req) {
   try {
     const { url } = await req.json();
-    console.log('Processing URL:', url); // Log for debugging on Vercel
-
-    // Validate URL
-    if (!url || typeof url !== 'string' || !ytdl.validateURL(url)) {
-      console.log('Invalid URL detected:', url);
+    
+    if (!ytdl.validateURL(url)) {
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
     }
 
-    // Fetch video info
-    console.log('Fetching video info...');
-    const info = await ytdl.getInfo(url);
-    console.log('Video info fetched:', info.videoDetails.title);
-
-    // Check if video details exist
-    if (!info?.videoDetails) {
-      console.log('No video details found');
-      return NextResponse.json({ error: 'Unable to fetch video details' }, { status: 400 });
-    }
-
-    // Choose format
-    const format = ytdl.chooseFormat(info.formats, {
-      quality: 'highest',
-      filter: (format) => format.container === 'mp4' && format.hasAudio && format.hasVideo,
+    const info = await ytdl.getInfo(url, {
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+      }
     });
+    
+    // Filter formats to get only those with both video and audio
+    const formats = info.formats
+      .filter(format => format.hasVideo && format.hasAudio)
+      .map(format => ({
+        url: format.url,
+        qualityLabel: format.qualityLabel,
+        container: format.container,
+        fps: format.fps,
+        size: format.contentLength
+      }))
+      .sort((a, b) => {
+        // Extract numeric value from qualityLabel (e.g., "720p" -> 720)
+        const qualityA = parseInt(a.qualityLabel);
+        const qualityB = parseInt(b.qualityLabel);
+        return qualityB - qualityA;
+      });
 
-    if (!format) {
-      console.log('No suitable format found');
-      return NextResponse.json({ error: 'No suitable video format found' }, { status: 400 });
-    }
-
-    // Return metadata
     return NextResponse.json({
-      url: format.url,
+      formats,
       title: info.videoDetails.title,
       thumbnail: info.videoDetails.thumbnails[0].url,
-      contentType: format.mimeType,
-      contentLength: format.contentLength,
+      duration: info.videoDetails.lengthSeconds
     });
 
   } catch (error) {
-    console.error('Error in API route:', error.message, error.stack); // Detailed logging
-    return NextResponse.json(
-      { error: 'Download failed: ' + error.message },
-      { status: 500 }
-    );
+    console.error('Error:', error);
+    return NextResponse.json({ error: 'Failed to get video info' }, { status: 500 });
   }
 }
